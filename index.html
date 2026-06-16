@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>南通工厂HEX车间大数据展示平台</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e27;
+      --bg-secondary: #0f1535;
+      --bg-card: #111832;
+      --border-color: #1e2d4a;
+      --text-primary: #e8ecf4;
+      --text-secondary: #7a8599;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-yellow: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .dashboard {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      gap: 12px;
+      background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    }
+
+    /* Row 1: Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      position: relative;
+      flex-shrink: 0;
+      height: 60px;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent-cyan), var(--accent-blue), transparent);
+    }
+
+    .header-title h1 {
+      font-size: clamp(18px, 2vw, 28px);
+      font-weight: 600;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: 3px;
+    }
+
+    .header-stats {
+      display: flex;
+      gap: clamp(15px, 2vw, 30px);
+      align-items: center;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .stat-value {
+      font-size: clamp(16px, 1.5vw, 22px);
+      font-weight: 700;
+    }
+
+    .stat-value.blue { color: var(--accent-blue); }
+    .stat-value.green { color: var(--accent-green); }
+    .stat-value.red { color: var(--accent-red); }
+
+    .datetime {
+      font-size: clamp(11px, 1vw, 13px);
+      color: var(--text-secondary);
+      min-width: 160px;
+      text-align: right;
+    }
+
+    /* Row 2: Main Content (3 columns) */
+    .row-main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1.5fr 1fr;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    /* Row 3: Bottom Content (2 columns) */
+    .row-bottom {
+      flex: 0.8;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    /* Panel Styles */
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .panel-header::before {
+      content: '';
+      width: 3px;
+      height: 16px;
+      background: linear-gradient(180deg, var(--accent-cyan), var(--accent-blue));
+      border-radius: 2px;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .panel-body {
+      flex: 1;
+      padding: 12px;
+      overflow: hidden;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Chart Container */
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* OEE Section - Compact Layout */
+    .oee-section {
+      display: flex;
+      gap: 10px;
+      height: 100%;
+    }
+
+    .oee-left {
+      flex: 0.45;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .oee-pie-card {
+      flex: 1;
+      background: rgba(17, 24, 50, 0.3);
+      border-radius: 6px;
+      padding: 3px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 0;
+    }
+
+    .oee-pie-title {
+      font-size: 8px;
+      color: var(--text-secondary);
+      margin-bottom: 1px;
+      flex-shrink: 0;
+    }
+
+    .oee-pie-chart {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .oee-pie-value {
+      font-size: 9px;
+      font-weight: 700;
+      margin-top: 1px;
+      flex-shrink: 0;
+    }
+
+    .oee-right {
+      flex: 1.55;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Team OEE List with Fixed Header */
+    .team-oee-list {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .team-oee-header {
+      display: grid;
+      grid-template-columns: 28px 1fr 55px;
+      gap: 6px;
+      padding: 6px 8px;
+      background: rgba(59, 130, 246, 0.15);
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-blue);
+      flex-shrink: 0;
+    }
+
+    .team-oee-scroll-container {
+      flex: 1;
+      overflow-y: auto;
+      margin-top: 6px;
+    }
+
+    .team-oee-scroll-container::-webkit-scrollbar {
+      display: none;
+    }
+
+    .team-oee-scroll {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .team-oee-item {
+      display: grid;
+      grid-template-columns: 28px 1fr 55px;
+      gap: 6px;
+      padding: 6px 8px;
+      background: rgba(17, 24, 50, 0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 11px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .item-index {
+      width: 20px;
+      height: 20px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .item-name {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .item-oee {
+      text-align: center;
+      font-weight: 600;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+
+    .item-oee.high {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-green);
+    }
+
+    .item-oee.medium {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-yellow);
+    }
+
+    .item-oee.low {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+    }
+
+    /* Safety Stats */
+    .safety-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      height: 100%;
+    }
+
+    .safety-stat-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .safety-stat-card {
+      background: rgba(17, 24, 50, 0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .safety-stat-number {
+      font-size: clamp(18px, 2vw, 26px);
+      font-weight: 700;
+    }
+
+    .safety-stat-desc {
+      font-size: 10px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .safety-progress {
+      margin-top: 6px;
+      padding: 8px;
+      background: rgba(17, 24, 50, 0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+    }
+
+    .safety-progress-bar {
+      height: 6px;
+      background: rgba(30, 45, 74, 0.5);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .safety-progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    /* Production Line List with Fixed Header */
+    .prod-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .prod-header {
+      display: grid;
+      grid-template-columns: 26px 1fr repeat(3, 48px);
+      gap: 5px;
+      padding: 6px 8px;
+      background: rgba(59, 130, 246, 0.15);
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--accent-blue);
+      flex-shrink: 0;
+    }
+
+    .prod-scroll-container {
+      flex: 1;
+      overflow-y: auto;
+      margin-top: 5px;
+    }
+
+    .prod-scroll-container::-webkit-scrollbar {
+      display: none;
+    }
+
+    .prod-content {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .prod-item {
+      display: grid;
+      grid-template-columns: 26px 1fr repeat(3, 48px);
+      gap: 5px;
+      padding: 6px 8px;
+      background: rgba(17, 24, 50, 0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 10px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .prod-value {
+      text-align: center;
+      padding: 2px 3px;
+      border-radius: 3px;
+      font-size: 9px;
+    }
+
+    .prod-value.good {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-green);
+    }
+
+    .prod-value.warning {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-yellow);
+    }
+
+    /* Hide scrollbar global */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Iframe Container */
+    .iframe-container {
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-radius: 6px;
+      background: rgba(17, 24, 50, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Row 1: Header -->
+    <div class="header">
+      <div class="header-title">
+        <h1>南通工厂HEX车间大数据展示平台</h1>
+      </div>
+      <div class="header-stats">
+        <div class="stat-item">
+          <span class="stat-label">平台设备</span>
+          <span class="stat-value blue">84</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">运行设备</span>
+          <span class="stat-value green">58</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">停机设备</span>
+          <span class="stat-value red">26</span>
+        </div>
+      </div>
+      <div class="datetime" id="datetime"></div>
+    </div>
+
+    <!-- Row 2: Main Content (3 columns) -->
+    <div class="row-main">
+      <!-- Left: Production Plan Chart -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">HEX车间计划达成率</span>
+        </div>
+        <div class="panel-body">
+          <div class="chart-container">
+            <canvas id="productionChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: OEE Display -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">OEE数据分析</span>
+        </div>
+        <div class="panel-body">
+          <div class="oee-section">
+            <!-- Left: 2 Small Pie Charts -->
+            <div class="oee-left">
+              <div class="oee-pie-card" style="flex: 0.45;">
+                <div class="oee-pie-title">车间OEE总数据</div>
+                <div class="oee-pie-chart">
+                  <canvas id="totalOEEChart"></canvas>
+                </div>
+                <div class="oee-pie-value" style="color: var(--accent-cyan)">84.3%</div>
+              </div>
+              <div class="oee-pie-card" style="flex: 0.55; display: flex; flex-direction: column;">
+                <div class="oee-pie-title">各区域OEE对比</div>
+                <div class="oee-pie-chart" style="flex: 1; min-height: 0;">
+                  <canvas id="zonesOEEChart"></canvas>
+                </div>
+                <div id="zonesLegendContainer" style="margin-top: 4px;"></div>
+              </div>
+            </div>
+
+            <!-- Right: Team OEE List -->
+            <div class="oee-right">
+              <div class="team-oee-list">
+                <div class="team-oee-header">
+                  <div>序号</div>
+                  <div>班组</div>
+                  <div>OEE</div>
+                </div>
+                <div class="team-oee-scroll-container">
+                  <div class="team-oee-scroll" id="teamOEEScroll">
+                    <!-- Populated by JavaScript -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Safety Stats -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">安全统计</span>
+        </div>
+        <div class="panel-body">
+          <div class="safety-stats">
+            <div class="safety-stat-row">
+              <div class="safety-stat-card">
+                <div class="safety-stat-number" style="color: var(--accent-green)">524</div>
+                <div class="safety-stat-desc">安全生产天数</div>
+              </div>
+              <div class="safety-stat-card">
+                <div class="safety-stat-number" style="color: var(--accent-cyan)">38</div>
+                <div class="safety-stat-desc">无事故周数</div>
+              </div>
+            </div>
+            <div class="safety-stat-row">
+              <div class="safety-stat-card">
+                <div class="safety-stat-number" style="color: var(--accent-green)">0</div>
+                <div class="safety-stat-desc">今日事故数</div>
+              </div>
+              <div class="safety-stat-card">
+                <div class="safety-stat-number" style="color: var(--accent-blue)">100%</div>
+                <div class="safety-stat-desc">安全培训率</div>
+              </div>
+            </div>
+            <div class="safety-progress">
+              <div style="font-size: 11px; color: var(--text-secondary);">年度安全目标达成率</div>
+              <div style="font-size: 18px; font-weight: 700; color: var(--accent-green); margin-top: 4px;">98.5%</div>
+              <div class="safety-progress-bar">
+                <div class="safety-progress-fill" style="width: 98.5%; background: linear-gradient(90deg, var(--accent-green), #34d399);"></div>
+              </div>
+            </div>
+            <div class="safety-progress">
+              <div style="font-size: 11px; color: var(--text-secondary);">隐患整改完成率</div>
+              <div style="font-size: 18px; font-weight: 700; color: var(--accent-cyan); margin-top: 4px;">95.2%</div>
+              <div class="safety-progress-bar">
+                <div class="safety-progress-fill" style="width: 95.2%; background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Bottom Content -->
+    <div class="row-bottom">
+      <!-- Left+Center: External Link Iframe -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">能源数据管理</span>
+        </div>
+        <div class="panel-body" style="padding: 0;">
+          <iframe 
+            class="iframe-container"
+            src="http://dp.yunjichaobiao.com/#/home?ProjectID=15199&projectName=AINT&username=AINT&token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiIyNTM3NiIsIlBJRCI6IjE1MTk5IiwiTGFuZyI6ImNuIiwiUlR5cGUiOiJzdHJpbmciLCJDbGllbnQiOiIwIiwiSnVtcFZlcnNpb24iOiJ2MiIsIlZlcnNpb24iOmZhbHNlLCJleHAiOjE4MTE0ODc2MzJ9.uMwYAZLZdVolQakFRr5NsnozNqVivQ1D6Y2pZEnMzCQ"
+            title="实时监控大屏"
+            sandbox="allow-same-origin allow-scripts"
+          ></iframe>
+        </div>
+      </div>
+
+      <!-- Right: Production Line Achievement -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">产线达成情况</span>
+        </div>
+        <div class="panel-body">
+          <div class="prod-list">
+            <div class="prod-header">
+              <div>序号</div>
+              <div>班组</div>
+              <div>时间稼动</div>
+              <div>性能稼动</div>
+              <div>良品率</div>
+            </div>
+            <div class="prod-scroll-container">
+              <div class="prod-content" id="prodListContent">
+                <!-- Populated by JavaScript -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Update datetime
+    function updateDateTime() {
+      const now = new Date();
+      const options = { 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit', 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: false 
+      };
+      document.getElementById('datetime').textContent = now.toLocaleString('zh-CN', options);
+    }
+    setInterval(updateDateTime, 1000);
+    updateDateTime();
+
+    // Production Plan Chart - X轴使用D3-D11的数据
+    const productionCtx = document.getElementById('productionChart').getContext('2d');
+    
+    // Data from Excel 汇总 sheet D3-D11 (equipment names)
+    const categories = ['组装3组', '组装2组', '组装1组', '钎焊组', '气密超声波组', '亲水组', '干检组', '氦检1组', '氦检2组'];
+    const plannedData = [17900, 83500, 13600, 23700, 17900, 17900, 17900, 17900, 17900];
+    const actualData = [17050, 81254, 13280, 23500, 17050, 17050, 17050, 17050, 17050];
+    const completionRate = plannedData.map((p, i) => ((actualData[i] / p) * 100).toFixed(1));
+
+    new Chart(productionCtx, {
+      type: 'bar',
+      data: {
+        labels: categories,
+        datasets: [{
+          label: '累计计划',
+          data: plannedData,
+          backgroundColor: 'rgba(59, 130, 246, 0.6)',
+          borderColor: '#3b82f6',
+          borderWidth: 1,
+          yAxisID: 'y'
+        }, {
+          label: '累计达成',
+          data: actualData,
+          backgroundColor: 'rgba(16, 185, 129, 0.6)',
+          borderColor: '#10b981',
+          borderWidth: 1,
+          yAxisID: 'y'
+        }, {
+          label: '计划达成率',
+          data: completionRate,
+          type: 'line',
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          borderWidth: 2,
+          tension: 0.4,
+          pointRadius: 4,
+          pointBackgroundColor: '#f59e0b',
+          yAxisID: 'y1'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#7a8599', font: { size: 10 } } }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(30, 45, 74, 0.5)' }, ticks: { color: '#7a8599', font: { size: 9 } } },
+          y: {
+            type: 'linear', display: true, position: 'left',
+            grid: { color: 'rgba(30, 45, 74, 0.5)' },
+            ticks: { color: '#7a8599', stepSize: 20000, callback: v => v.toLocaleString() }
+          },
+          y1: {
+            type: 'linear', display: true, position: 'right',
+            grid: { drawOnChartArea: false },
+            ticks: { color: '#f59e0b', stepSize: 20, callback: v => v + '%' },
+            min: 0, max: 120
+          }
+        }
+      }
+    });
+
+    // Total OEE Doughnut Chart (Small & Beautiful)
+    const totalOEECtx = document.getElementById('totalOEEChart').getContext('2d');
+    new Chart(totalOEECtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['OEE', '剩余'],
+        datasets: [{
+          data: [84.3, 15.7],
+          backgroundColor: [
+            'rgba(6, 182, 212, 0.85)',
+            'rgba(30, 45, 74, 0.25)'
+          ],
+          borderColor: [
+            '#06b6d4',
+            'transparent'
+          ],
+          borderWidth: 2,
+          cutout: '72%'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(17, 24, 50, 0.9)',
+            titleColor: '#e8ecf4',
+            bodyColor: '#e8ecf4',
+            borderColor: '#3b82f6',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                return context.label + ': ' + context.parsed.toFixed(1) + '%';
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // 4-Zone OEE Pie Chart with labeled values using datalabels plugin
+    const zonesOEECtx = document.getElementById('zonesOEEChart').getContext('2d');
+    new Chart(zonesOEECtx, {
+      type: 'pie',
+      data: {
+        labels: ['组装区', '钎焊区', '综合检', '氦检区'],
+        datasets: [{
+          data: [80.1, 94.9, 60.4, 90.2],
+          backgroundColor: [
+            'rgba(16, 185, 129, 0.85)',
+            'rgba(59, 130, 246, 0.85)',
+            'rgba(139, 92, 246, 0.85)',
+            'rgba(245, 158, 11, 0.85)'
+          ],
+          borderColor: [
+            '#10b981',
+            '#3b82f6',
+            '#8b5cf6',
+            '#f59e0b'
+          ],
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+          padding: {
+            left: 80,
+            right: 80
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(17, 24, 50, 0.9)',
+            titleColor: '#e8ecf4',
+            bodyColor: '#e8ecf4',
+            borderColor: '#3b82f6',
+            borderWidth: 1,
+            callbacks: {
+              label: function(context) {
+                return context.label + ': ' + context.parsed.toFixed(1) + '%';
+              }
+            }
+          },
+          datalabels: { display: false }
+        }
+      },
+      plugins: [ChartDataLabels]
+    });
+
+    // Add custom legend for zones OEE chart
+    const zonesLegend = document.createElement('div');
+    zonesLegend.style.cssText = 'display: flex; justify-content: center; padding: 0 5px;';
+    
+    const leftLegend = document.createElement('div');
+    leftLegend.style.cssText = 'display: flex; flex-direction: column; gap: 4px; margin-right: 20px;';
+    leftLegend.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 12px; height: 10px; background: rgba(16, 185, 129, 0.85); border: 2px solid #10b981; border-radius: 2px;"></div>
+        <span style="color: #ffffff; font-size: 9px; font-weight: bold;">组装区 80.1%</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 12px; height: 10px; background: rgba(139, 92, 246, 0.85); border: 2px solid #8b5cf6; border-radius: 2px;"></div>
+        <span style="color: #ffffff; font-size: 9px; font-weight: bold;">综合检 60.4%</span>
+      </div>
+    `;
+    
+    const rightLegend = document.createElement('div');
+    rightLegend.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
+    rightLegend.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 12px; height: 10px; background: rgba(59, 130, 246, 0.85); border: 2px solid #3b82f6; border-radius: 2px;"></div>
+        <span style="color: #ffffff; font-size: 9px; font-weight: bold;">钎焊区 94.9%</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 12px; height: 10px; background: rgba(245, 158, 11, 0.85); border: 2px solid #f59e0b; border-radius: 2px;"></div>
+        <span style="color: #ffffff; font-size: 9px; font-weight: bold;">检区 90.2%</span>
+      </div>
+    `;
+    
+    zonesLegend.appendChild(leftLegend);
+    zonesLegend.appendChild(rightLegend);
+    
+    const legendContainer = document.getElementById('zonesLegendContainer');
+    legendContainer.appendChild(zonesLegend);
+
+    // Team OEE Data (from Excel 汇总 sheet D15-D23)
+    const teamOEEDatas = [
+      { name: '组装3组', oee: 80.09 },
+      { name: '组装2组', oee: 40.59 },
+      { name: '组装1组', oee: 101.82 },
+      { name: '钎焊组', oee: 94.89 },
+      { name: '气密超声波组', oee: 60.40 },
+      { name: '亲水组', oee: 85.01 },
+      { name: '干检组', oee: 44.39 },
+      { name: '检1组', oee: 104.96 },
+      { name: '氦检2组', oee: 79.19 }
+    ];
+
+    const teamOEEScroll = document.getElementById('teamOEEScroll');
+
+    function renderTeamOEE() {
+      teamOEEScroll.innerHTML = '';
+      teamOEEDatas.forEach((team, index) => {
+        const item = document.createElement('div');
+        item.className = 'team-oee-item';
+        
+        let oeeClass = 'high';
+        if (team.oee < 60) oeeClass = 'low';
+        else if (team.oee < 80) oeeClass = 'medium';
+        
+        item.innerHTML = `
+          <div class="item-index">${index + 1}</div>
+          <div class="item-name">${team.name}</div>
+          <div class="item-oee ${oeeClass}">${team.oee.toFixed(1)}%</div>
+        `;
+        teamOEEScroll.appendChild(item);
+      });
+    }
+
+    renderTeamOEE();
+
+    // Auto-scroll for team OEE
+    let teamScrollOffset = 0;
+    const teamScrollContainer = document.querySelector('.team-oee-scroll-container');
+    
+    function autoScrollTeamOEE() {
+      if (teamScrollContainer && teamScrollContainer.scrollHeight > teamScrollContainer.clientHeight) {
+        teamScrollOffset += 0.5;
+        if (teamScrollOffset >= teamScrollContainer.scrollHeight - teamScrollContainer.clientHeight) {
+          teamScrollOffset = 0;
+        }
+        teamScrollContainer.scrollTop = teamScrollOffset;
+      }
+      requestAnimationFrame(autoScrollTeamOEE);
+    }
+
+    setTimeout(autoScrollTeamOEE, 2000);
+
+    // Production Line Data (from Excel 汇总 sheet D15-D23)
+    const prodLineData = [
+      { name: '组装3组', timeRate: 96.48, perfRate: 86.85, qualityRate: 99.63 },
+      { name: '组装2组', timeRate: 95.80, perfRate: 40.59, qualityRate: 99.94 },
+      { name: '组装1组', timeRate: 96.59, perfRate: 101.82, qualityRate: 99.50 },
+      { name: '钎焊组', timeRate: 86.36, perfRate: 94.89, qualityRate: 99.91 },
+      { name: '气密超声波组', timeRate: 95.45, perfRate: 60.40, qualityRate: 99.73 },
+      { name: '亲水组', timeRate: 94.20, perfRate: 85.01, qualityRate: 99.65 },
+      { name: '干检组', timeRate: 90.91, perfRate: 44.39, qualityRate: 99.32 },
+      { name: '检1组', timeRate: 94.32, perfRate: 104.96, qualityRate: 99.81 },
+      { name: '氦检2组', timeRate: 95.17, perfRate: 79.19, qualityRate: 99.76 }
+    ];
+
+    const prodListContent = document.getElementById('prodListContent');
+
+    function renderProdList() {
+      prodListContent.innerHTML = '';
+      prodLineData.forEach((line, index) => {
+        const item = document.createElement('div');
+        item.className = 'prod-item';
+        item.innerHTML = `
+          <div class="item-index">${index + 1}</div>
+          <div class="item-name">${line.name}</div>
+          <div class="prod-value ${line.timeRate >= 95 ? 'good' : 'warning'}">${line.timeRate.toFixed(1)}%</div>
+          <div class="prod-value ${line.perfRate >= 80 ? 'good' : line.perfRate >= 60 ? 'warning' : ''}">${line.perfRate.toFixed(1)}%</div>
+          <div class="prod-value good">${line.qualityRate.toFixed(1)}%</div>
+        `;
+        prodListContent.appendChild(item);
+      });
+    }
+
+    renderProdList();
+
+    // Auto-scroll for production list
+    let prodScrollOffset = 0;
+    const prodScrollContainer = document.querySelector('.prod-scroll-container');
+    
+    function autoScrollProd() {
+      if (prodScrollContainer && prodScrollContainer.scrollHeight > prodScrollContainer.clientHeight) {
+        prodScrollOffset += 0.5;
+        if (prodScrollOffset >= prodScrollContainer.scrollHeight - prodScrollContainer.clientHeight) {
+          prodScrollOffset = 0;
+        }
+        prodScrollContainer.scrollTop = prodScrollOffset;
+      }
+      requestAnimationFrame(autoScrollProd);
+    }
+
+    setTimeout(autoScrollProd, 2000);
+  </script>
+</body>
+</html>
