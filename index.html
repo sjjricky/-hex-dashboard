@@ -470,6 +470,45 @@
       border-radius: 6px;
       background: rgba(17, 24, 50, 0.3);
     }
+
+    /* Error Message */
+    .iframe-error {
+      display: none;
+      width: 100%;
+      height: 100%;
+      padding: 20px;
+      background: rgba(17, 24, 50, 0.5);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 6px;
+      color: #ef4444;
+      overflow: auto;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .iframe-error.show {
+      display: flex;
+    }
+
+    .error-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+
+    .error-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .error-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-align: center;
+      max-width: 300px;
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -609,11 +648,22 @@
         </div>
         <div class="panel-body" style="padding: 0;">
           <iframe 
+            id="energyIframe"
             class="iframe-container"
-           src="http://dp.yunjichaobiao.com/#/home?ProjectID=15199&projectName=AINT&username=AINT&token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiIyNTM3NiIsIlBJRCI6IjE1MTk5IiwiTGFuZyI6ImNuIiwiUlR5cGUiOiJzdHJpbmciLCJDbGllbnQiOiIwIiwiSnVtcFZlcnNpb24iOiJ2MiIsIlZlcnNpb24iOmZhbHNlLCJleHAiOjE4MTE0ODc2MzJ9.uMwYAZLZdVolQakFRr5NsnozNqVivQ1D6Y2pZEnMzCQ"
+            src="https://dp.yunjichaobiao.com/#/home?ProjectID=15199&projectName=AINT&username=AINT"
             title="实时监控大屏"
-            sandbox="allow-same-origin allow-scripts"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation-by-user-activation"
+            style="display: block;"
           ></iframe>
+          <div id="iframeError" class="iframe-error">
+            <div class="error-icon">⚠️</div>
+            <div class="error-title">加载失败</div>
+            <div class="error-desc">
+              无法加载能源数据管理系统。<br>
+              请检查网络连接或稍后重试。<br>
+              如需完全访问，请在外部浏览器打开。
+            </div>
+          </div>
         </div>
       </div>
 
@@ -659,6 +709,35 @@
     }
     setInterval(updateDateTime, 1000);
     updateDateTime();
+
+    // Handle iframe loading errors
+    const energyIframe = document.getElementById('energyIframe');
+    const iframeError = document.getElementById('iframeError');
+
+    energyIframe.addEventListener('error', function() {
+      energyIframe.style.display = 'none';
+      iframeError.classList.add('show');
+    });
+
+    // Retry mechanism - reload iframe every 30 seconds if it failed
+    let iframeRetryCount = 0;
+    const maxRetries = 3;
+
+    function retryIframeLoad() {
+      if (iframeRetryCount < maxRetries && iframeError.classList.contains('show')) {
+        iframeRetryCount++;
+        // Reset iframe src to retry loading
+        const currentSrc = energyIframe.src;
+        energyIframe.src = '';
+        setTimeout(() => {
+          energyIframe.src = currentSrc;
+          energyIframe.style.display = 'block';
+          iframeError.classList.remove('show');
+        }, 1000);
+      }
+    }
+
+    setTimeout(retryIframeLoad, 30000);
 
     // Production Plan Chart - X轴使用D3-D11的数据
     const productionCtx = document.getElementById('productionChart').getContext('2d');
